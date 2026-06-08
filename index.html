@@ -3,24 +3,54 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>マンガランキング分析</title>
+<title>マンガランキング分析ツール</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#fff;color:#1a1a1a;font-family:-apple-system,'Hiragino Sans',sans-serif;min-height:100vh}
-.app{max-width:900px;margin:0 auto;padding:1.5rem 1rem 3rem}
-.hdr{margin-bottom:1.5rem}
-.hdr h1{font-size:22px;font-weight:600;margin-bottom:4px}
-.hdr p{font-size:13px;color:#666}
+body{background:#f8f8f8;color:#1a1a1a;font-family:-apple-system,'Hiragino Sans',sans-serif;min-height:100vh}
+.app{max-width:960px;margin:0 auto;padding:0 1rem 4rem}
+
+/* ===== ヒーロー ===== */
+.hero{text-align:center;padding:3rem 1rem 2rem;border-bottom:1px solid #e8e8e8;margin-bottom:2rem;background:#fff;border-radius:0 0 16px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.hero h1{font-size:28px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
+.hero p{font-size:14px;color:#666;margin-bottom:1.5rem;line-height:1.7}
+.hero-badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.svc-badge{font-size:12px;font-weight:600;padding:4px 14px;border-radius:999px}
+.b-renta-h{background:#fff0e8;color:#c0550b;border:1px solid #f0c8a0}
+.b-pic-h{background:#e8f0fe;color:#1a56a3;border:1px solid #b0c8f0}
+.b-sey-h{background:#fff8e1;color:#8a6d00;border:1px solid #e8d888}
+.b-nico-h{background:#e8f5e9;color:#2e7d32;border:1px solid #a8d8a8}
+.dl-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;font-size:14px;font-weight:700;border-radius:10px;background:#1a1a1a;color:#fff;text-decoration:none;cursor:pointer;border:none;transition:background .15s}
+.dl-btn:hover{background:#333}
+.dl-btn-sub{font-size:11px;opacity:.7;font-weight:400}
+
+/* ===== 使い方 ===== */
+.how-section{background:#fff;border-radius:16px;padding:2rem;margin-bottom:2rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.how-section h2{font-size:18px;font-weight:800;margin-bottom:1.25rem;display:flex;align-items:center;gap:8px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.step{background:#f8f8f8;border-radius:12px;padding:16px;position:relative}
+.step-num{font-size:11px;font-weight:800;color:#fff;background:#1a1a1a;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.step h3{font-size:13px;font-weight:700;margin-bottom:4px}
+.step p{font-size:12px;color:#666;line-height:1.6}
+.step code{font-size:10px;background:#e8e8e8;padding:1px 5px;border-radius:4px;font-family:monospace}
+
+/* ===== ツール本体 ===== */
+.tool-section{background:#fff;border-radius:16px;padding:2rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.tool-section h2{font-size:18px;font-weight:800;margin-bottom:1.25rem}
+
 .card{background:#f5f5f5;border-radius:12px;padding:14px 16px;margin-bottom:1rem}
-.card-ttl{font-size:13px;font-weight:600;margin-bottom:8px}
+.card-ttl{font-size:13px;font-weight:700;margin-bottom:8px}
 textarea{width:100%;font-size:11px;font-family:monospace;border:1px solid #ddd;border-radius:8px;padding:8px 10px;background:#fff;color:#1a1a1a;resize:vertical;display:block;outline:none}
 textarea:focus{border-color:#1a1a1a}
-.btn-primary{display:inline-flex;align-items:center;gap:5px;padding:8px 18px;font-size:13px;font-weight:600;border-radius:8px;border:none;background:#1a1a1a;color:#fff;cursor:pointer;margin-top:8px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.btn-primary{display:inline-flex;align-items:center;gap:5px;padding:8px 18px;font-size:13px;font-weight:700;border-radius:8px;border:none;background:#1a1a1a;color:#fff;cursor:pointer}
 .btn-primary:hover{background:#333}
-.btn-ghost{display:inline-flex;align-items:center;gap:5px;padding:8px 18px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid #ddd;background:transparent;color:#1a1a1a;cursor:pointer;margin-top:8px}
-.btn-ghost:hover{background:#f5f5f5}
+.btn-secondary{display:inline-flex;align-items:center;gap:5px;padding:8px 18px;font-size:13px;font-weight:700;border-radius:8px;border:1.5px solid #1a1a1a;background:#fff;color:#1a1a1a;cursor:pointer}
+.btn-secondary:hover{background:#f5f5f5}
+.btn-green{background:#2e7d32;color:#fff;border:none}
+.btn-green:hover{background:#1b5e20}
 .err{font-size:12px;color:#c0392b;margin-top:6px;display:none}.err.on{display:block}
+
 .status-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem}
 .status-chip{padding:4px 12px;font-size:12px;border:2px solid #1a1a1a;border-radius:999px;background:#1a1a1a;color:#fff;font-weight:700}
 .filter-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.6rem;align-items:center}
@@ -34,6 +64,7 @@ textarea:focus{border-color:#1a1a1a}
 .svc-pic{border-color:#1a56a3;color:#1a56a3}.svc-pic.active{background:#e8f0fe}
 .svc-sey{border-color:#8a6d00;color:#8a6d00}.svc-sey.active{background:#fff8e1}
 .svc-nico{border-color:#2e7d32;color:#2e7d32}.svc-nico.active{background:#e8f5e9}
+
 .tabs{display:flex;gap:4px;margin-bottom:1.25rem;flex-wrap:wrap;border-bottom:1px solid #eee;padding-bottom:0}
 .tab{padding:8px 16px;font-size:13px;border:none;background:transparent;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
 .tab:hover{color:#1a1a1a}
@@ -85,12 +116,8 @@ textarea:focus{border-color:#1a1a1a}
 .attr-work-item:last-child{border-bottom:none}
 .attr-work-svc{font-size:10px;padding:1px 6px;border-radius:999px;background:#fff;color:#888;margin-right:5px;border:1px solid #eee}
 .pub-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem}
-@media(max-width:600px){.pub-grid{grid-template-columns:1fr}.pgrid{grid-template-columns:1fr}}
-.abox{background:#f5f5f5;border-radius:12px;padding:16px;font-size:13px;line-height:1.8;color:#1a1a1a;white-space:pre-wrap;min-height:60px}
+@media(max-width:600px){.pub-grid{grid-template-columns:1fr}.pgrid{grid-template-columns:1fr}.steps{grid-template-columns:1fr}}
 .divider{height:1px;background:#ebebeb;margin:1.75rem 0}
-.cmp-tabs{display:flex;gap:7px;margin-bottom:12px}
-.cmp-tab{font-size:12px;padding:4px 12px;border:1px solid #ddd;border-radius:999px;cursor:pointer;background:#fff;color:#888;font-weight:500}
-.cmp-tab.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
 .cr-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
 .cr-table th{padding:7px 10px;text-align:left;font-weight:700;color:#888;border-bottom:2px solid #eee;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 .cr-table td{padding:8px 10px;border-bottom:1px solid #f5f5f5;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -107,106 +134,150 @@ textarea:focus{border-color:#1a1a1a}
 </head>
 <body>
 <div class="app">
-  <div class="hdr">
-    <h1>📊 マンガランキング分析</h1>
-    <p>Renta! / ニコニコ漫画 / ピッコマ / コミックシーモア — Chrome拡張でデータ収集 → ここで分析</p>
+
+  <!-- ===== ヒーロー ===== -->
+  <div class="hero">
+    <h1>📊 マンガランキング分析ツール</h1>
+    <p>複数のマンガプラットフォームのランキングを一括取得・分析するツールです。<br>Chrome拡張でデータを収集して、このページで分析できます。</p>
+    <div class="hero-badges">
+      <span class="svc-badge b-renta-h">Renta!</span>
+      <span class="svc-badge b-pic-h">ピッコマ</span>
+      <span class="svc-badge b-sey-h">コミックシーモア</span>
+      <span class="svc-badge b-nico-h">ニコニコ漫画</span>
+    </div>
+    <a href="manga-ranking-extension.zip" download class="dl-btn">
+      📥 Chrome拡張をダウンロード
+      <span class="dl-btn-sub">（ZIP）</span>
+    </a>
   </div>
 
-  <div id="inputArea">
-    <div class="card">
-      <div class="card-ttl">拡張データを貼り付け</div>
-      <p style="font-size:12px;color:#888;margin-bottom:8px">Chrome拡張でランキング取得 → JSONをコピー → 下に貼り付け</p>
-      <textarea id="pasteArea" rows="5" placeholder='{"renta_shounen_daily":[...],"niconico_shounen_monthly":[...],"piccoma_fantasy_daily":[...],"seymour_shounen_daily":[...],...}'></textarea>
-      <div class="err" id="pasteErr">JSONの形式が正しくありません。</div>
-      <button class="btn-primary" id="loadBtn">読み込む</button>
+  <!-- ===== 使い方 ===== -->
+  <div class="how-section">
+    <h2>🚀 使い方</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>拡張をインストール</h3>
+        <p>上のボタンからZIPをダウンロード。解凍して <code>chrome://extensions</code> からインストール。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>ランキングを取得</h3>
+        <p>拡張のアイコンをクリック → サービス・ジャンル・期間を選択 → 「取得」ボタンを押す。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>JSONをコピー</h3>
+        <p>取得完了後「JSONをコピー」ボタンを押す。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>このページで分析</h3>
+        <p>下の入力欄に貼り付けて「読み込む」。属性ワード・出版社・クロス集計などを分析できます。</p>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem;padding:12px 16px;background:#f5f5f5;border-radius:10px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">Chrome拡張のインストール手順</div>
+      <ol style="font-size:12px;color:#555;line-height:2;padding-left:1.2rem">
+        <li>ZIPファイルを解凍する</li>
+        <li>Chromeで <code style="background:#e8e8e8;padding:1px 5px;border-radius:4px">chrome://extensions</code> を開く</li>
+        <li>右上の「デベロッパーモード」をONにする</li>
+        <li>「パッケージ化されていない拡張機能を読み込む」→ 解凍したフォルダを選択</li>
+      </ol>
     </div>
   </div>
 
-  <div id="mainContent" style="display:none">
-    <span class="back-link" id="backBtn">← データを編集する</span>
-    <div class="status-bar" id="statusBar"></div>
+  <!-- ===== ツール本体 ===== -->
+  <div class="tool-section">
+    <h2>📈 分析ツール</h2>
 
-    <div class="filter-bar">
-      <span class="filter-label">期間</span>
-      <button class="pill active" data-p="daily">日間</button>
-      <button class="pill" data-p="monthly">月間</button>
-      <button class="pill" data-p="all">両方</button>
-    </div>
-    <div class="filter-bar" id="filterBar">
-      <span class="filter-label">ジャンル</span>
-      <button class="pill active" data-g="all">すべて</button>
-      <button class="pill" data-g="shounen">少年</button>
-      <button class="pill" data-g="seinen">青年</button>
-      <button class="pill" data-g="shoujo">少女</button>
-      <button class="pill" data-g="josei">女性</button>
-      <button class="pill" data-g="bl">BL</button>
-      <button class="pill" data-g="tl">TL</button>
-    </div>
-    <div class="filter-bar" id="svcFilterBar">
-      <span class="filter-label">サービス</span>
-      <button class="svc-pill svc-renta active" data-svc="renta">Renta!</button>
-      <button class="svc-pill svc-pic active" data-svc="piccoma">ピッコマ</button>
-      <button class="svc-pill svc-sey active" data-svc="seymour">シーモア</button>
-      <button class="svc-pill svc-nico active" data-svc="niconico">ニコニコ</button>
+    <div id="inputArea">
+      <div class="card">
+        <div class="card-ttl">拡張データを貼り付け</div>
+        <p style="font-size:12px;color:#888;margin-bottom:8px">Chrome拡張でランキング取得 → JSONをコピー → 下に貼り付け</p>
+        <textarea id="pasteArea" rows="5" placeholder='{"renta_shounen_daily":[...],"piccoma_fantasy_daily":[...],"seymour_shounen_daily":[...],...}'></textarea>
+        <div class="err" id="pasteErr">JSONの形式が正しくありません。</div>
+        <div class="btn-row">
+          <button class="btn-primary" id="loadBtn">読み込む</button>
+        </div>
+      </div>
     </div>
 
-    <div class="tabs" id="tabBar">
-      <button class="tab active" data-tab="overview">概要</button>
-      <button class="tab" data-tab="ranking">ランキング</button>
-      <button class="tab" data-tab="trends">傾向分析</button>
-      <button class="tab" data-tab="cross">クロス集計</button>
-    </div>
+    <div id="mainContent" style="display:none">
+      <span class="back-link" id="backBtn">← データを編集する</span>
+      <div class="status-bar" id="statusBar"></div>
 
-    <div id="tabContent">
-      <div id="tabOverview" class="active-tab">
-        <div class="metrics" id="metricsRow"></div>
-        <div class="section"><div class="sec-ttl">TOP5 <span class="badge" id="ovBadge"></span></div><div class="pgrid" id="ovGrid"></div></div>
+      <div class="filter-bar">
+        <span class="filter-label">期間</span>
+        <button class="pill active" data-p="daily">日間</button>
+        <button class="pill" data-p="monthly">月間</button>
+        <button class="pill" data-p="all">両方</button>
+      </div>
+      <div class="filter-bar" id="filterBar">
+        <span class="filter-label">ジャンル</span>
+        <button class="pill active" data-g="all">すべて</button>
+        <button class="pill" data-g="shounen">少年</button>
+        <button class="pill" data-g="seinen">青年</button>
+        <button class="pill" data-g="shoujo">少女</button>
+        <button class="pill" data-g="josei">女性</button>
+        <button class="pill" data-g="bl">BL</button>
+        <button class="pill" data-g="tl">TL</button>
+      </div>
+      <div class="filter-bar" id="svcFilterBar">
+        <span class="filter-label">サービス</span>
+        <button class="svc-pill svc-renta active" data-svc="renta">Renta!</button>
+        <button class="svc-pill svc-pic active" data-svc="piccoma">ピッコマ</button>
+        <button class="svc-pill svc-sey active" data-svc="seymour">シーモア</button>
+        <button class="svc-pill svc-nico active" data-svc="niconico">ニコニコ</button>
       </div>
 
-      <div id="tabRanking">
-        <div class="section"><div class="sec-ttl">ランキング <span class="badge" id="rankBadge"></span></div><div class="pgrid" id="rankGrid"></div></div>
+      <!-- CSV エクスポートボタン -->
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+        <button class="btn-secondary btn-green" id="csvBtn">⬇ CSVエクスポート</button>
       </div>
 
-      <div id="tabTrends">
-        <div class="axis-legend" id="axisLegend"></div>
-        <div class="section">
-          <div class="sec-ttl">属性ワード <span class="badge" id="attrBadge"></span></div>
-          <p style="font-size:12px;color:#888;margin-bottom:10px">同タイトル重複はカウント1。色=最多登場ジャンル軸。クリックで作品一覧。</p>
-          <div class="attr-cloud" id="attrCloud"></div>
+      <div class="tabs" id="tabBar">
+        <button class="tab active" data-tab="overview">概要</button>
+        <button class="tab" data-tab="ranking">ランキング</button>
+        <button class="tab" data-tab="trends">傾向分析</button>
+        <button class="tab" data-tab="cross">クロス集計</button>
+      </div>
+
+      <div id="tabContent">
+        <div id="tabOverview" class="active-tab">
+          <div class="metrics" id="metricsRow"></div>
+          <div class="section"><div class="sec-ttl">TOP5 <span class="badge" id="ovBadge"></span></div><div class="pgrid" id="ovGrid"></div></div>
         </div>
-        <div class="attr-panel" id="attrPanel"><div class="attr-panel-ttl" id="attrPanelTitle"></div><div id="attrPanelList"></div></div>
-        <div class="divider"></div>
-        <div class="pub-grid">
-          <div class="section"><div class="sec-ttl">出版社 <span class="badge" id="pubBadge"></span></div><div id="pubList"></div></div>
-          <div class="section"><div class="sec-ttl">レーベル <span class="badge" id="labelBadge"></span></div><div id="labelList"></div></div>
+
+        <div id="tabRanking">
+          <div class="section"><div class="sec-ttl">ランキング <span class="badge" id="rankBadge"></span></div><div class="pgrid" id="rankGrid"></div></div>
         </div>
-        <div class="divider"></div>
-        <div class="section">
-          <div class="sec-ttl">AI傾向分析 <span class="badge" id="aiStatusBadge">依頼待ち</span></div>
-          <p style="font-size:12px;color:#888;margin-bottom:10px">下のボタンを押すとClaudeの入力欄にデータが送られます（Claude.aiで開いている場合）</p>
-          <div class="cmp-tabs"><button class="cmp-tab active" id="ctAll">全位</button><button class="cmp-tab" id="ctTop">TOP5</button></div>
-          <div class="abox" id="aboxAll">データ読み込み後、下のボタンで傾向分析を依頼してください。</div>
-          <div class="abox" id="aboxTop" style="display:none">TOP5の傾向分析がここに入ります。</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-            <button class="btn-ghost" id="aiCopyBtn">📋 分析プロンプトをコピー</button>
+
+        <div id="tabTrends">
+          <div class="axis-legend" id="axisLegend"></div>
+          <div class="section">
+            <div class="sec-ttl">属性ワード <span class="badge" id="attrBadge"></span></div>
+            <p style="font-size:12px;color:#888;margin-bottom:10px">同タイトル重複はカウント1。色=最多登場ジャンル軸。クリックで作品一覧。</p>
+            <div class="attr-cloud" id="attrCloud"></div>
           </div>
-          <div style="margin-top:14px">
-            <div style="font-size:12px;color:#888;margin-bottom:6px">Claudeの分析テキストを貼り付け</div>
-            <textarea id="aiPasteAll" rows="4" placeholder="全位の分析をここに貼り付け"></textarea>
-            <textarea id="aiPasteTop" rows="4" placeholder="TOP5の分析をここに貼り付け" style="margin-top:8px"></textarea>
-            <button class="btn-primary" id="aiLoadBtn">分析を反映</button>
+          <div class="attr-panel" id="attrPanel"><div class="attr-panel-ttl" id="attrPanelTitle"></div><div id="attrPanelList"></div></div>
+          <div class="divider"></div>
+          <div class="pub-grid">
+            <div class="section"><div class="sec-ttl">出版社 <span class="badge" id="pubBadge"></span></div><div id="pubList"></div></div>
+            <div class="section"><div class="sec-ttl">レーベル <span class="badge" id="labelBadge"></span></div><div id="labelList"></div></div>
           </div>
         </div>
-      </div>
 
-      <div id="tabCross">
-        <div class="section">
-          <div class="sec-ttl">複数サービス登場タイトル <span class="badge" id="crossBadge"></span></div>
-          <div style="overflow-x:auto">
-            <table class="cr-table">
-              <thead><tr><th style="width:38%">タイトル</th><th style="width:8%">軸</th><th style="width:54%">サービス・順位</th></tr></thead>
-              <tbody id="crossBody"></tbody>
-            </table>
+        <div id="tabCross">
+          <div class="section">
+            <div class="sec-ttl">複数サービス登場タイトル <span class="badge" id="crossBadge"></span></div>
+            <div style="overflow-x:auto">
+              <table class="cr-table">
+                <thead><tr><th style="width:38%">タイトル</th><th style="width:8%">軸</th><th style="width:54%">サービス・順位</th></tr></thead>
+                <tbody id="crossBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -238,7 +309,7 @@ function cleanTitle(t){
     .replace(/\s+/g,' ').trim();
 }
 function parseAuthor(raw){
-  if(!raw||!raw.trim())return null; raw=raw.trim();
+  if(!raw||!raw.trim())return null;raw=raw.trim();
   const rp=/(.+?)[（(]([^）)]+)[）)]/g;const rps=[];let m;
   while((m=rp.exec(raw))!==null){const name=m[1].trim(),role=m[2].trim();if(name.length>=1&&name.length<=30){const rl={'漫画':'漫画','著者':'著者','原作':'原作','作画':'作画','キャラクターデザイン':'キャラデザ','キャラクター原案':'キャラ原案','原案':'原案','ストーリー':'ストーリー','監修':'監修'};rps.push({name,role:rl[role]||role});}}
   if(rps.length>0)return{type:'roles',parts:rps};
@@ -263,9 +334,7 @@ let rawData={},activeTab='overview',selectedAttr=null;
 let activePeriod='daily',activeAxis='all';
 let activeSvcs=new Set(['renta','piccoma','seymour','niconico']);
 let cardOpenState={};
-let currentPrompt='';
 
-// localStorage
 function saveData(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({rawData,activePeriod,activeAxis,activeSvcs:[...activeSvcs]}));}catch(e){}}
 function loadSaved(){
   try{
@@ -326,7 +395,6 @@ function updateStatusBar(){
   const svcLabel=allSvcs.every(s=>activeSvcs.has(s))?'全サービス':[...activeSvcs].map(s=>SVC_NAMES[s]||s).join('・');
   document.getElementById('statusBar').innerHTML=
     `<span class="status-chip">${pLabel}</span><span class="status-chip">${gLabel}</span><span class="status-chip">${svcLabel}</span>`;
-  // フィルターボタンの状態も同期
   document.querySelectorAll('[data-p]').forEach(b=>b.classList.toggle('active',b.dataset.p===activePeriod));
   document.querySelectorAll('[data-g]').forEach(b=>b.classList.toggle('active',b.dataset.g===activeAxis));
   document.querySelectorAll('[data-svc]').forEach(b=>b.classList.toggle('active',activeSvcs.has(b.dataset.svc)));
@@ -479,8 +547,6 @@ function renderTrends(){
   }
   renderPubList('pubList','pubBadge','publisher');
   renderPubList('labelList','labelBadge','label');
-  // AI分析プロンプト生成
-  buildAIPrompt();
 }
 
 function showAttrPanel(word,data){
@@ -516,52 +582,36 @@ function renderCross(){
   }).join(''):'<tr><td colspan="3" class="empty">複数サービス登場タイトルなし</td></tr>';
 }
 
-function buildAIPrompt(){
-  const uniq=getUniqueItems(),all=getItems(30);
-  const bySvc={};
-  for(const it of all){const n=svcName(it._svc,it._genre,it._period);if(!bySvc[n])bySvc[n]=[];bySvc[n].push(it);}
-  const aw={};for(const it of uniq)for(const w of ATTR_WORDS)if(it.title.includes(w))aw[w]=(aw[w]||0)+1;
-  const topAttrs=Object.entries(aw).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([w,c])=>`${w}(${c})`).join('、');
-  const pubCnt={},labCnt={};
-  for(const it of uniq){if(it.publisher)pubCnt[it.publisher]=(pubCnt[it.publisher]||0)+1;if(it.label)labCnt[it.label]=(labCnt[it.label]||0)+1;}
-  const topPubs=Object.entries(pubCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c])=>`${n}(${c})`).join('、');
-  const topLabels=Object.entries(labCnt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,c])=>`${n}(${c})`).join('、');
-  const top5=Object.entries(bySvc).map(([n,items])=>`【${n}】${items.slice(0,5).map(i=>i._clean+(i.author?'('+i.author+')':'')).join('、')}`).join('\n');
-  const allN=Object.entries(bySvc).map(([n,items])=>`【${n}】${items.map(i=>i._clean).join('、')}`).join('\n');
-  const axLabel=activeAxis==='all'?'全ジャンル':(AXIS_LABELS[activeAxis]||activeAxis);
-  const pLabel=PERIOD_NAMES[activePeriod]||activePeriod;
-  currentPrompt=`以下は日本マンガプラットフォームの${axLabel}・${pLabel}ランキングデータです（タイトル重複除き）。\n\n属性ワードTOP: ${topAttrs}\n出版社TOP: ${topPubs||'データなし'}\nレーベルTOP: ${topLabels||'データなし'}\n\nTOP5:\n${top5}\n\n全位:\n${allN}\n\n【分析1: 全ランキングの傾向】と【分析2: TOP5の傾向】の見出しを付けて、それぞれ400〜600字で分析してください。属性ワード・出版社・レーベル傾向・プラットフォーム差異・注目作品・今後の展望を含めてください。`;
-}
-
-function showAI(t){
-  document.getElementById('ctAll').classList.toggle('active',t==='all');
-  document.getElementById('ctTop').classList.toggle('active',t==='top');
-  document.getElementById('aboxAll').style.display=t==='all'?'':'none';
-  document.getElementById('aboxTop').style.display=t==='top'?'':'none';
-}
-
-document.getElementById('aiCopyBtn').onclick=()=>{
-  buildAIPrompt();
-  navigator.clipboard.writeText(currentPrompt).then(()=>{
-    const btn=document.getElementById('aiCopyBtn');
-    btn.textContent='✅ コピーしました！';
-    setTimeout(()=>btn.textContent='📋 分析プロンプトをコピー',2500);
-  }).catch(()=>{
-    const ta=document.createElement('textarea');ta.value=currentPrompt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
-    document.getElementById('aiCopyBtn').textContent='✅ コピーしました！';
-    setTimeout(()=>document.getElementById('aiCopyBtn').textContent='📋 分析プロンプトをコピー',2500);
+// ===== CSVエクスポート =====
+function exportCSV(){
+  const all=getItems(99);
+  if(!all.length){alert('表示中のデータがありません');return;}
+  const header=['順位','タイトル','クリーンタイトル','作者','ジャンル軸','期間','サービス','出版社','レーベル'];
+  const rows=all.map(it=>{
+    const axLabel=it._axes.map(ax=>AXIS_LABELS[ax]||ax).join('/');
+    const svc=svcName(it._svc,it._genre,it._period);
+    return [
+      it.rank,
+      `"${(it.title||'').replace(/"/g,'""')}"`,
+      `"${(it._clean||'').replace(/"/g,'""')}"`,
+      `"${(it.author||'').replace(/"/g,'""')}"`,
+      axLabel,
+      PERIOD_NAMES[it._period]||it._period,
+      svc,
+      `"${(it.publisher||'').replace(/"/g,'""')}"`,
+      `"${(it.label||'').replace(/"/g,'""')}"`,
+    ].join(',');
   });
-};
-
-document.getElementById('ctAll').onclick=()=>showAI('all');
-document.getElementById('ctTop').onclick=()=>showAI('top');
-document.getElementById('aiLoadBtn').onclick=()=>{
-  const t1=document.getElementById('aiPasteAll').value.trim();
-  const t2=document.getElementById('aiPasteTop').value.trim();
-  if(t1)document.getElementById('aboxAll').textContent=t1;
-  if(t2)document.getElementById('aboxTop').textContent=t2;
-  if(t1||t2)document.getElementById('aiStatusBadge').textContent='反映済み';
-};
+  const csv='\uFEFF'+header.join(',')+'\n'+rows.join('\n'); // BOM付きUTF-8
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const date=new Date().toISOString().slice(0,10);
+  a.href=url;a.download=`manga-ranking-${date}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('csvBtn').onclick=exportCSV;
 
 function loadData(){
   const raw=document.getElementById('pasteArea').value.trim();
@@ -581,10 +631,8 @@ function loadData(){
     updateStatusBar();renderCurrentTab();saveData();
   }catch(e){err.classList.add('on');}
 }
-
 document.getElementById('loadBtn').onclick=loadData;
 
-// 起動時: localStorageから復元
 if(loadSaved()){
   document.getElementById('mainContent').style.display='';
   document.getElementById('inputArea').style.display='none';

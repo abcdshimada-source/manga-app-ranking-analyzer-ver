@@ -650,8 +650,10 @@ function exportCSV(){
   const wb = XLSX.utils.book_new();
 
   // ========== Sheet1: ランキング全件（メインデータ） ==========
-  // 日次集積を見据え、取得日列を含める
-  const rankHeader = ['取得日','順位','タイトル','クリーンタイトル','作者','原作者','作画者','ジャンル軸','期間','サービス名','サービスキー','出版社','レーベル'];
+  // 各列でオートフィルタ絞り込みできるよう、サービス・ジャンル・期間を独立列に
+  const SVC_DISPLAY = { renta:'Renta!', piccoma:'ピッコマ', seymour:'シーモア', niconico:'ニコニコ漫画' };
+  const GENRE_DISPLAY = { shounen:'少年', seinen:'青年', shoujo:'少女', josei:'女性', bl:'BL', tl:'TL', fantasy:'ファンタジー', action:'アクション', romance:'恋愛' };
+  const rankHeader = ['取得日','サービス','元ジャンル','ジャンル軸','期間','順位','タイトル','クリーンタイトル','作者','原作者','作画者','出版社','レーベル','サービスキー'];
   const rankRows = [rankHeader];
   const allItems = getItemsByCondition('all','all',99);
   for(const it of allItems){
@@ -669,84 +671,18 @@ function exportCSV(){
       }
     }
     rankRows.push([
-      today, it.rank, it.title, it._clean, it.author||'',
-      original, art, axLabel,
+      today,
+      SVC_DISPLAY[it._svc]||it._svc,
+      GENRE_DISPLAY[it._genre]||it._genre,
+      axLabel,
       PERIOD_NAMES[it._period]||it._period,
-      svcName(it._svc,it._genre,it._period),
-      it._key,
-      it.publisher||'', it.label||''
+      it.rank, it.title, it._clean, it.author||'',
+      original, art,
+      it.publisher||'', it.label||'',
+      it._key
     ]);
   }
-  XLSX.utils.book_append_sheet(wb, makeSheet(rankRows), 'ランキング（全件）');
-
-  // ========== Sheet1.5: サービス×ジャンル×期間ごとの分割シート ==========
-  // Excelのシートタブで一覧から選べるように、各ランキングを個別シートに
-  const SVC_SHORT = { renta:'レンタ', piccoma:'ピッコマ', seymour:'シーモア', niconico:'ニコニコ' };
-  const GENRE_SHORT = { shounen:'少年', seinen:'青年', shoujo:'少女', josei:'女性', bl:'BL', tl:'TL', fantasy:'ファンタジー', action:'アクション', romance:'恋愛' };
-  const PERIOD_SHORT = { daily:'日', monthly:'月' };
-  // データキーをソート（サービス→ジャンル→期間の順）
-  const sortedKeys = Object.keys(rawData).filter(k => rawData[k] && rawData[k].length > 0);
-  // サービス順、ジャンル順、期間順
-  const SVC_ORDER = ['piccoma','seymour','renta','niconico'];
-  const GENRE_DISPLAY_ORDER = ['shounen','seinen','shoujo','josei','bl','tl','fantasy','action','romance'];
-  sortedKeys.sort((a, b) => {
-    const ka = parseKey(a), kb = parseKey(b);
-    const sa = SVC_ORDER.indexOf(ka.svc), sb = SVC_ORDER.indexOf(kb.svc);
-    if (sa !== sb) return sa - sb;
-    const ga = GENRE_DISPLAY_ORDER.indexOf(ka.genre), gb = GENRE_DISPLAY_ORDER.indexOf(kb.genre);
-    if (ga !== gb) return ga - gb;
-    return ka.period === 'daily' ? -1 : 1;
-  });
-  const usedNames = new Set();
-  for (const key of sortedKeys) {
-    const { svc, genre, period } = parseKey(key);
-    const list = rawData[key];
-    // シート名（31文字制限あり、日本語短縮）
-    let sheetName = `${SVC_SHORT[svc]||svc}_${GENRE_SHORT[genre]||genre}_${PERIOD_SHORT[period]||period}`;
-    // 重複回避
-    let suffix = 2;
-    const baseName = sheetName;
-    while (usedNames.has(sheetName)) {
-      sheetName = `${baseName}(${suffix++})`;
-    }
-    if (sheetName.length > 31) sheetName = sheetName.slice(0, 31);
-    usedNames.add(sheetName);
-
-    // ヘッダー（マスターシートと同じ構造、ただしサービス・期間・ジャンルは固定なので簡略化）
-    const splitHeader = ['順位','タイトル','クリーンタイトル','作者','原作者','作画者','出版社','レーベル'];
-    const splitRows = [splitHeader];
-    for (const it of list) {
-      const parsed = parseAuthor(it.author || '');
-      let original = '', art = '';
-      if (parsed) {
-        if (parsed.type === 'duo') { original = parsed.original; art = parsed.art; }
-        else if (parsed.type === 'roles') {
-          const o = parsed.parts.find(p => p.role === '原作' || p.role === '原案');
-          const a = parsed.parts.find(p => p.role === '漫画' || p.role === '作画' || p.role === '著者');
-          if (o) original = o.name;
-          if (a) art = a.name;
-        }
-      }
-      splitRows.push([
-        it.rank, it.title, cleanTitle(it.title), it.author || '',
-        original, art, it.publisher || '', it.label || ''
-      ]);
-    }
-    // タイトル情報行を先頭に追加（取得日とランキング名を明示）
-    const titleRow = [`${svcName(svc, genre, period)} (取得日: ${today})`];
-    const finalRows = [titleRow, [], splitHeader, ...splitRows.slice(1)];
-    const ws = makeSheet(finalRows);
-    // タイトル行のセル結合
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: splitHeader.length - 1 } }];
-    // オートフィルタは3行目（ヘッダー）から
-    if (splitRows.length > 1) {
-      const lastCol = XLSX.utils.encode_col(splitHeader.length - 1);
-      const lastRow = finalRows.length;
-      ws['!autofilter'] = { ref: `A3:${lastCol}${lastRow}` };
-      ws['!views'] = [{ state: 'frozen', ySplit: 3 }];
-    }
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  }
+  XLSX.utils.book_append_sheet(wb, makeSheet(rankRows), 'ランキング');
 
   // ========== Sheet2: 属性ワード集計 ==========
   const attrHeader = ['取得日','期間','ジャンル','属性ワード','出現数','主な軸'];
@@ -779,22 +715,25 @@ function exportCSV(){
 
   // ========== Sheet2.5: 属性ワード×作品（フィルタ用） ==========
   // 各属性ワードに該当する作品を1行ずつ列挙。Excelで属性ワード列のフィルタで作品が絞り込める
-  const attrWorkHeader = ['取得日','属性ワード','タイトル','クリーンタイトル','作者','ジャンル軸','期間','サービス名','出版社','レーベル','ランキング順位'];
+  const attrWorkHeader = ['取得日','属性ワード','サービス','元ジャンル','ジャンル軸','期間','順位','タイトル','クリーンタイトル','作者','出版社','レーベル'];
   const attrWorkRows = [attrWorkHeader];
-  // 全データから属性ワードを含む作品をすべて列挙
   for(const[key,list] of Object.entries(rawData)){
     if(!list||!list.length)continue;
     const{svc,genre,period:p}=parseKey(key);
     const axesK = getAxes(svc,genre);
     const axLabel = axesK.map(ax=>AXIS_LABELS[ax]||ax).join('/');
-    const svcN = svcName(svc,genre,p);
     for(const it of list){
       for(const w of ATTR_WORDS){
         if(!it.title.includes(w))continue;
         attrWorkRows.push([
-          today, w, it.title, cleanTitle(it.title), it.author||'',
-          axLabel, PERIOD_NAMES[p]||p, svcN,
-          it.publisher||'', it.label||'', it.rank
+          today, w,
+          SVC_DISPLAY[svc]||svc,
+          GENRE_DISPLAY[genre]||genre,
+          axLabel,
+          PERIOD_NAMES[p]||p,
+          it.rank,
+          it.title, cleanTitle(it.title), it.author||'',
+          it.publisher||'', it.label||''
         ]);
       }
     }

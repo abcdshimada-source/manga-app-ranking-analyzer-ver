@@ -583,31 +583,162 @@ function renderCross(){
 }
 
 // ===== CSVエクスポート =====
+// CSV ヘルパー
+function csvEscape(v){return `"${String(v==null?'':v).replace(/"/g,'""')}"`;}
+function csvRow(arr){return arr.map(csvEscape).join(',');}
+
+// 指定条件でアイテム取得（フィルタを一時的に差し替え）
+function getItemsByCondition(period, axis, svcSet, lim){
+  const items=[];
+  for(const[key,list] of Object.entries(rawData)){
+    if(!list||!list.length)continue;
+    const{svc,genre,period:p}=parseKey(key);
+    if(period!=='all' && p!==period)continue;
+    if(svcSet && !svcSet.has(svc))continue;
+    const axes=getAxes(svc,genre);
+    if(axis!=='all' && !axes.includes(axis))continue;
+    const slice=lim?list.slice(0,lim):list;
+    for(const it of slice)items.push({...it,_key:key,_svc:svc,_genre:genre,_period:p,_axes:axes,_clean:cleanTitle(it.title)});
+  }
+  return items;
+}
+function getUniqueByCondition(period, axis, svcSet){
+  const seen=new Set(),result=[];
+  for(const[key,list] of Object.entries(rawData)){
+    if(!list||!list.length)continue;
+    const{svc,genre,period:p}=parseKey(key);
+    if(period!=='all' && p!==period)continue;
+    if(svcSet && !svcSet.has(svc))continue;
+    const axes=getAxes(svc,genre);
+    if(axis!=='all' && !axes.includes(axis))continue;
+    for(const it of list){
+      const cl=cleanTitle(it.title);if(seen.has(cl))continue;seen.add(cl);
+      result.push({...it,_key:key,_svc:svc,_genre:genre,_period:p,_axes:axes,_clean:cl});
+    }
+  }
+  return result;
+}
+
 function exportCSV(){
-  const all=getItems(99);
-  if(!all.length){alert('表示中のデータがありません');return;}
-  const header=['順位','タイトル','クリーンタイトル','作者','ジャンル軸','期間','サービス','出版社','レーベル'];
-  const rows=all.map(it=>{
+  if(!Object.keys(rawData).length){alert('データがありません');return;}
+  const ALL_SVCS=new Set(['renta','piccoma','seymour','niconico']);
+  const lines=[];
+
+  // ========== セクション1: 全ランキングデータ ==========
+  lines.push('===== ランキングデータ（全件） =====');
+  lines.push(csvRow(['順位','タイトル','クリーンタイトル','作者','ジャンル軸','期間','サービス','出版社','レーベル']));
+  const allItems=getItemsByCondition('all','all',null,99);
+  for(const it of allItems){
     const axLabel=it._axes.map(ax=>AXIS_LABELS[ax]||ax).join('/');
-    const svc=svcName(it._svc,it._genre,it._period);
-    return [
-      it.rank,
-      `"${(it.title||'').replace(/"/g,'""')}"`,
-      `"${(it._clean||'').replace(/"/g,'""')}"`,
-      `"${(it.author||'').replace(/"/g,'""')}"`,
-      axLabel,
-      PERIOD_NAMES[it._period]||it._period,
-      svc,
-      `"${(it.publisher||'').replace(/"/g,'""')}"`,
-      `"${(it.label||'').replace(/"/g,'""')}"`,
-    ].join(',');
-  });
-  const csv='\uFEFF'+header.join(',')+'\n'+rows.join('\n'); // BOM付きUTF-8
+    lines.push(csvRow([it.rank, it.title, it._clean, it.author||'', axLabel, PERIOD_NAMES[it._period]||it._period, svcName(it._svc,it._genre,it._period), it.publisher||'', it.label||'']));
+  }
+  lines.push('');
+
+  // ========== セクション2: 属性ワード集計（ジャンル×期間別） ==========
+  lines.push('===== 属性ワード集計 =====');
+  lines.push(csvRow(['ジャンル','期間','属性ワード','出現数','主な軸']));
+  const periods=['daily','monthly','all'];
+  const axes=['all','shounen','seinen','shoujo','josei','bl','tl'];
+  for(const period of periods){
+    for(const axis of axes){
+      const uniq=getUniqueByCondition(period,axis,null);
+      if(!uniq.length)continue;
+      const aw={};const awAxis={};
+      for(const it of uniq){
+        for(const w of ATTR_WORDS){
+          if(!it.title.includes(w))continue;
+          aw[w]=(aw[w]||0)+1;
+          if(!awAxis[w])awAxis[w]={};
+          for(const ax of it._axes)awAxis[w][ax]=(awAxis[w][ax]||0)+1;
+        }
+      }
+      const sorted=Object.entries(aw).sort((a,b)=>b[1]-a[1]);
+      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      for(const[w,c] of sorted){
+        const axisEntries=Object.entries(awAxis[w]||{}).sort((a,b)=>b[1]-a[1]);
+        const topAx=axisEntries[0]?(AXIS_LABELS[axisEntries[0][0]]||axisEntries[0][0]):'';
+        lines.push(csvRow([gLabel,pLabel,w,c,topAx]));
+      }
+    }
+  }
+  lines.push('');
+
+  // ========== セクション3: 出版社集計 ==========
+  lines.push('===== 出版社集計 =====');
+  lines.push(csvRow(['ジャンル','期間','出版社','作品数']));
+  for(const period of periods){
+    for(const axis of axes){
+      const uniq=getUniqueByCondition(period,axis,null);
+      const cnt={};
+      for(const it of uniq){if(it.publisher&&it.publisher.trim())cnt[it.publisher]=(cnt[it.publisher]||0)+1;}
+      const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+      if(!sorted.length)continue;
+      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      for(const[n,c] of sorted) lines.push(csvRow([gLabel,pLabel,n,c]));
+    }
+  }
+  lines.push('');
+
+  // ========== セクション4: レーベル集計 ==========
+  lines.push('===== レーベル集計 =====');
+  lines.push(csvRow(['ジャンル','期間','レーベル','作品数']));
+  for(const period of periods){
+    for(const axis of axes){
+      const uniq=getUniqueByCondition(period,axis,null);
+      const cnt={};
+      for(const it of uniq){if(it.label&&it.label.trim())cnt[it.label]=(cnt[it.label]||0)+1;}
+      const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+      if(!sorted.length)continue;
+      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      for(const[n,c] of sorted) lines.push(csvRow([gLabel,pLabel,n,c]));
+    }
+  }
+  lines.push('');
+
+  // ========== セクション5: クロス集計（複数サービス登場） ==========
+  lines.push('===== クロス集計（複数サービス登場タイトル） =====');
+  lines.push(csvRow(['期間','タイトル','登場ジャンル軸','登場サービス・順位']));
+  for(const period of periods){
+    const all=getItemsByCondition(period,'all',null,99);
+    const tm={};
+    for(const it of all){
+      const k=it._clean;
+      if(!tm[k])tm[k]={title:it._clean,axes:new Set(),keys:new Set(),ranks:{}};
+      for(const ax of it._axes)tm[k].axes.add(ax);
+      tm[k].keys.add(it._key);
+      if(!tm[k].ranks[it._key])tm[k].ranks[it._key]=it.rank;
+    }
+    const cross=Object.values(tm).filter(v=>v.keys.size>=2).sort((a,b)=>b.keys.size-a.keys.size);
+    if(!cross.length)continue;
+    const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+    for(const v of cross){
+      const axL=[...v.axes].map(ax=>AXIS_LABELS[ax]||ax).join('/');
+      const pts=[...v.keys].map(k=>{const{svc,genre,period:p}=parseKey(k);return `${svcName(svc,genre,p)} #${v.ranks[k]||'?'}`;}).join(' / ');
+      lines.push(csvRow([pLabel,v.title,axL,pts]));
+    }
+  }
+  lines.push('');
+
+  // ========== セクション6: サマリー ==========
+  lines.push('===== サマリー =====');
+  lines.push(csvRow(['項目','値']));
+  const allUniq=getUniqueByCondition('all','all',null);
+  lines.push(csvRow(['総ユニークタイトル数', allUniq.length]));
+  lines.push(csvRow(['総ランキング行数', allItems.length]));
+  const svcCount={};for(const it of allItems)svcCount[it._svc]=(svcCount[it._svc]||0)+1;
+  for(const[svc,c] of Object.entries(svcCount)) lines.push(csvRow([SVC_NAMES[svc]+'の取得件数',c]));
+  lines.push(csvRow(['エクスポート日時', new Date().toLocaleString('ja-JP')]));
+
+  // 出力
+  const csv='\uFEFF'+lines.join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   const date=new Date().toISOString().slice(0,10);
-  a.href=url;a.download=`manga-ranking-${date}.csv`;
+  a.href=url;a.download=`manga-ranking-analysis-${date}.csv`;
   document.body.appendChild(a);a.click();document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }

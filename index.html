@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>マンガランキング分析ツール</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f8f8f8;color:#1a1a1a;font-family:-apple-system,'Hiragino Sans',sans-serif;min-height:100vh}
@@ -232,9 +233,9 @@ textarea:focus{border-color:#1a1a1a}
         <button class="svc-pill svc-nico active" data-svc="niconico">ニコニコ</button>
       </div>
 
-      <!-- CSV エクスポートボタン -->
+      <!-- Excel エクスポートボタン -->
       <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
-        <button class="btn-secondary btn-green" id="csvBtn">⬇ CSVエクスポート</button>
+        <button class="btn-secondary btn-green" id="csvBtn">⬇ Excelエクスポート（.xlsx）</button>
       </div>
 
       <div class="tabs" id="tabBar">
@@ -582,19 +583,16 @@ function renderCross(){
   }).join(''):'<tr><td colspan="3" class="empty">複数サービス登場タイトルなし</td></tr>';
 }
 
-// ===== CSVエクスポート =====
-// CSV ヘルパー
-function csvEscape(v){return `"${String(v==null?'':v).replace(/"/g,'""')}"`;}
-function csvRow(arr){return arr.map(csvEscape).join(',');}
+// ===== Excel エクスポート（.xlsx） =====
+// 日次データ集積用に正規化した形で出力。各シートにオートフィルタ付き。
 
-// 指定条件でアイテム取得（フィルタを一時的に差し替え）
-function getItemsByCondition(period, axis, svcSet, lim){
+// 指定条件のアイテム取得（一時的なフィルタ）
+function getItemsByCondition(period, axis, lim){
   const items=[];
   for(const[key,list] of Object.entries(rawData)){
     if(!list||!list.length)continue;
     const{svc,genre,period:p}=parseKey(key);
     if(period!=='all' && p!==period)continue;
-    if(svcSet && !svcSet.has(svc))continue;
     const axes=getAxes(svc,genre);
     if(axis!=='all' && !axes.includes(axis))continue;
     const slice=lim?list.slice(0,lim):list;
@@ -602,13 +600,12 @@ function getItemsByCondition(period, axis, svcSet, lim){
   }
   return items;
 }
-function getUniqueByCondition(period, axis, svcSet){
+function getUniqueByCondition(period, axis){
   const seen=new Set(),result=[];
   for(const[key,list] of Object.entries(rawData)){
     if(!list||!list.length)continue;
     const{svc,genre,period:p}=parseKey(key);
     if(period!=='all' && p!==period)continue;
-    if(svcSet && !svcSet.has(svc))continue;
     const axes=getAxes(svc,genre);
     if(axis!=='all' && !axes.includes(axis))continue;
     for(const it of list){
@@ -619,130 +616,180 @@ function getUniqueByCondition(period, axis, svcSet){
   return result;
 }
 
+// シート作成ヘルパー: 2D配列からシートを作り、オートフィルタを設定
+function makeSheet(data, opts={}){
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  if(data.length>1){
+    // オートフィルタを1行目に設定
+    const numCols = data[0].length;
+    const lastCol = XLSX.utils.encode_col(numCols-1);
+    const lastRow = data.length;
+    ws['!autofilter'] = { ref: `A1:${lastCol}${lastRow}` };
+    // 列幅を自動調整（ざっくり）
+    ws['!cols'] = data[0].map((_,i) => {
+      const maxLen = data.reduce((m,row) => {
+        const v = String(row[i]==null?'':row[i]);
+        return Math.max(m, v.length);
+      }, 0);
+      // 日本語1文字を2幅扱い
+      const jpLen = Math.min(50, Math.max(8, maxLen * 1.4));
+      return { wch: jpLen };
+    });
+    // ヘッダー行を固定
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+  }
+  return ws;
+}
+
 function exportCSV(){
   if(!Object.keys(rawData).length){alert('データがありません');return;}
-  const ALL_SVCS=new Set(['renta','piccoma','seymour','niconico']);
-  const lines=[];
+  if(typeof XLSX === 'undefined'){alert('Excelライブラリの読み込みに失敗しました');return;}
 
-  // ========== セクション1: 全ランキングデータ ==========
-  lines.push('===== ランキングデータ（全件） =====');
-  lines.push(csvRow(['順位','タイトル','クリーンタイトル','作者','ジャンル軸','期間','サービス','出版社','レーベル']));
-  const allItems=getItemsByCondition('all','all',null,99);
+  const today = new Date().toISOString().slice(0,10);
+  const wb = XLSX.utils.book_new();
+
+  // ========== Sheet1: ランキング全件（メインデータ） ==========
+  // 日次集積を見据え、取得日列を含める
+  const rankHeader = ['取得日','順位','タイトル','クリーンタイトル','作者','原作者','作画者','ジャンル軸','期間','サービス名','サービスキー','出版社','レーベル'];
+  const rankRows = [rankHeader];
+  const allItems = getItemsByCondition('all','all',99);
   for(const it of allItems){
-    const axLabel=it._axes.map(ax=>AXIS_LABELS[ax]||ax).join('/');
-    lines.push(csvRow([it.rank, it.title, it._clean, it.author||'', axLabel, PERIOD_NAMES[it._period]||it._period, svcName(it._svc,it._genre,it._period), it.publisher||'', it.label||'']));
+    const axLabel = it._axes.map(ax=>AXIS_LABELS[ax]||ax).join('/');
+    // 作者をパースして原作・作画に分離
+    const parsed = parseAuthor(it.author||'');
+    let original='', art='';
+    if(parsed){
+      if(parsed.type==='duo'){ original=parsed.original; art=parsed.art; }
+      else if(parsed.type==='roles'){
+        const o = parsed.parts.find(p=>p.role==='原作' || p.role==='原案');
+        const a = parsed.parts.find(p=>p.role==='漫画' || p.role==='作画' || p.role==='著者');
+        if(o) original=o.name;
+        if(a) art=a.name;
+      }
+    }
+    rankRows.push([
+      today, it.rank, it.title, it._clean, it.author||'',
+      original, art, axLabel,
+      PERIOD_NAMES[it._period]||it._period,
+      svcName(it._svc,it._genre,it._period),
+      it._key,
+      it.publisher||'', it.label||''
+    ]);
   }
-  lines.push('');
+  XLSX.utils.book_append_sheet(wb, makeSheet(rankRows), 'ランキング');
 
-  // ========== セクション2: 属性ワード集計（ジャンル×期間別） ==========
-  lines.push('===== 属性ワード集計 =====');
-  lines.push(csvRow(['ジャンル','期間','属性ワード','出現数','主な軸']));
-  const periods=['daily','monthly','all'];
-  const axes=['all','shounen','seinen','shoujo','josei','bl','tl'];
+  // ========== Sheet2: 属性ワード集計 ==========
+  const attrHeader = ['取得日','期間','ジャンル','属性ワード','出現数','主な軸'];
+  const attrRows = [attrHeader];
+  const periods = ['daily','monthly','all'];
+  const axes = ['all','shounen','seinen','shoujo','josei','bl','tl'];
   for(const period of periods){
     for(const axis of axes){
-      const uniq=getUniqueByCondition(period,axis,null);
-      if(!uniq.length)continue;
-      const aw={};const awAxis={};
+      const uniq = getUniqueByCondition(period,axis);
+      if(!uniq.length) continue;
+      const aw={}; const awAxis={};
       for(const it of uniq){
         for(const w of ATTR_WORDS){
-          if(!it.title.includes(w))continue;
+          if(!it.title.includes(w)) continue;
           aw[w]=(aw[w]||0)+1;
-          if(!awAxis[w])awAxis[w]={};
-          for(const ax of it._axes)awAxis[w][ax]=(awAxis[w][ax]||0)+1;
+          if(!awAxis[w]) awAxis[w]={};
+          for(const ax of it._axes) awAxis[w][ax]=(awAxis[w][ax]||0)+1;
         }
       }
-      const sorted=Object.entries(aw).sort((a,b)=>b[1]-a[1]);
-      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
-      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      const sorted = Object.entries(aw).sort((a,b)=>b[1]-a[1]);
+      const gLabel = axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel = period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
       for(const[w,c] of sorted){
-        const axisEntries=Object.entries(awAxis[w]||{}).sort((a,b)=>b[1]-a[1]);
-        const topAx=axisEntries[0]?(AXIS_LABELS[axisEntries[0][0]]||axisEntries[0][0]):'';
-        lines.push(csvRow([gLabel,pLabel,w,c,topAx]));
+        const ax = Object.entries(awAxis[w]||{}).sort((a,b)=>b[1]-a[1])[0];
+        attrRows.push([today, pLabel, gLabel, w, c, ax?(AXIS_LABELS[ax[0]]||ax[0]):'']);
       }
     }
   }
-  lines.push('');
+  XLSX.utils.book_append_sheet(wb, makeSheet(attrRows), '属性ワード集計');
 
-  // ========== セクション3: 出版社集計 ==========
-  lines.push('===== 出版社集計 =====');
-  lines.push(csvRow(['ジャンル','期間','出版社','作品数']));
+  // ========== Sheet3: 出版社集計 ==========
+  const pubHeader = ['取得日','期間','ジャンル','出版社','作品数'];
+  const pubRows = [pubHeader];
   for(const period of periods){
     for(const axis of axes){
-      const uniq=getUniqueByCondition(period,axis,null);
+      const uniq = getUniqueByCondition(period,axis);
       const cnt={};
       for(const it of uniq){if(it.publisher&&it.publisher.trim())cnt[it.publisher]=(cnt[it.publisher]||0)+1;}
-      const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
-      if(!sorted.length)continue;
-      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
-      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
-      for(const[n,c] of sorted) lines.push(csvRow([gLabel,pLabel,n,c]));
+      const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+      if(!sorted.length) continue;
+      const gLabel = axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel = period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      for(const[n,c] of sorted) pubRows.push([today, pLabel, gLabel, n, c]);
     }
   }
-  lines.push('');
+  XLSX.utils.book_append_sheet(wb, makeSheet(pubRows), '出版社集計');
 
-  // ========== セクション4: レーベル集計 ==========
-  lines.push('===== レーベル集計 =====');
-  lines.push(csvRow(['ジャンル','期間','レーベル','作品数']));
+  // ========== Sheet4: レーベル集計 ==========
+  const labHeader = ['取得日','期間','ジャンル','レーベル','作品数'];
+  const labRows = [labHeader];
   for(const period of periods){
     for(const axis of axes){
-      const uniq=getUniqueByCondition(period,axis,null);
+      const uniq = getUniqueByCondition(period,axis);
       const cnt={};
       for(const it of uniq){if(it.label&&it.label.trim())cnt[it.label]=(cnt[it.label]||0)+1;}
-      const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
-      if(!sorted.length)continue;
-      const gLabel=axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
-      const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
-      for(const[n,c] of sorted) lines.push(csvRow([gLabel,pLabel,n,c]));
+      const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+      if(!sorted.length) continue;
+      const gLabel = axis==='all'?'全ジャンル':(AXIS_LABELS[axis]||axis);
+      const pLabel = period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+      for(const[n,c] of sorted) labRows.push([today, pLabel, gLabel, n, c]);
     }
   }
-  lines.push('');
+  XLSX.utils.book_append_sheet(wb, makeSheet(labRows), 'レーベル集計');
 
-  // ========== セクション5: クロス集計（複数サービス登場） ==========
-  lines.push('===== クロス集計（複数サービス登場タイトル） =====');
-  lines.push(csvRow(['期間','タイトル','登場ジャンル軸','登場サービス・順位']));
+  // ========== Sheet5: クロス集計（複数サービス登場） ==========
+  const crossHeader = ['取得日','期間','タイトル','登場サービス数','登場ジャンル軸','サービス・順位'];
+  const crossRows = [crossHeader];
   for(const period of periods){
-    const all=getItemsByCondition(period,'all',null,99);
+    const all = getItemsByCondition(period,'all',99);
     const tm={};
     for(const it of all){
       const k=it._clean;
-      if(!tm[k])tm[k]={title:it._clean,axes:new Set(),keys:new Set(),ranks:{}};
-      for(const ax of it._axes)tm[k].axes.add(ax);
+      if(!tm[k]) tm[k]={title:it._clean,axes:new Set(),keys:new Set(),ranks:{}};
+      for(const ax of it._axes) tm[k].axes.add(ax);
       tm[k].keys.add(it._key);
-      if(!tm[k].ranks[it._key])tm[k].ranks[it._key]=it.rank;
+      if(!tm[k].ranks[it._key]) tm[k].ranks[it._key]=it.rank;
     }
-    const cross=Object.values(tm).filter(v=>v.keys.size>=2).sort((a,b)=>b.keys.size-a.keys.size);
-    if(!cross.length)continue;
-    const pLabel=period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
+    const cross = Object.values(tm).filter(v=>v.keys.size>=2).sort((a,b)=>b.keys.size-a.keys.size);
+    if(!cross.length) continue;
+    const pLabel = period==='all'?'日間・月間':(PERIOD_NAMES[period]||period);
     for(const v of cross){
-      const axL=[...v.axes].map(ax=>AXIS_LABELS[ax]||ax).join('/');
-      const pts=[...v.keys].map(k=>{const{svc,genre,period:p}=parseKey(k);return `${svcName(svc,genre,p)} #${v.ranks[k]||'?'}`;}).join(' / ');
-      lines.push(csvRow([pLabel,v.title,axL,pts]));
+      const axL = [...v.axes].map(ax=>AXIS_LABELS[ax]||ax).join('/');
+      const pts = [...v.keys].map(k=>{const{svc,genre,period:p}=parseKey(k);return `${svcName(svc,genre,p)} #${v.ranks[k]||'?'}`;}).join(' / ');
+      crossRows.push([today, pLabel, v.title, v.keys.size, axL, pts]);
     }
   }
-  lines.push('');
+  XLSX.utils.book_append_sheet(wb, makeSheet(crossRows), 'クロス集計');
 
-  // ========== セクション6: サマリー ==========
-  lines.push('===== サマリー =====');
-  lines.push(csvRow(['項目','値']));
-  const allUniq=getUniqueByCondition('all','all',null);
-  lines.push(csvRow(['総ユニークタイトル数', allUniq.length]));
-  lines.push(csvRow(['総ランキング行数', allItems.length]));
+  // ========== Sheet6: サマリー ==========
+  const sumRows = [['項目','値']];
+  const allUniq = getUniqueByCondition('all','all');
+  sumRows.push(['取得日', today]);
+  sumRows.push(['エクスポート日時', new Date().toLocaleString('ja-JP')]);
+  sumRows.push(['総ユニークタイトル数', allUniq.length]);
+  sumRows.push(['総ランキング行数', allItems.length]);
+  sumRows.push(['', '']);
+  sumRows.push(['サービス別取得件数','']);
   const svcCount={};for(const it of allItems)svcCount[it._svc]=(svcCount[it._svc]||0)+1;
-  for(const[svc,c] of Object.entries(svcCount)) lines.push(csvRow([SVC_NAMES[svc]+'の取得件数',c]));
-  lines.push(csvRow(['エクスポート日時', new Date().toLocaleString('ja-JP')]));
+  for(const[svc,c] of Object.entries(svcCount)) sumRows.push([SVC_NAMES[svc]||svc, c]);
+  sumRows.push(['', '']);
+  sumRows.push(['ジャンル別ユニークタイトル数','']);
+  for(const ax of AXIS_ORDER){
+    const u = getUniqueByCondition('all', ax);
+    if(u.length) sumRows.push([AXIS_LABELS[ax], u.length]);
+  }
+  XLSX.utils.book_append_sheet(wb, makeSheet(sumRows), 'サマリー');
 
   // 出力
-  const csv='\uFEFF'+lines.join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  const date=new Date().toISOString().slice(0,10);
-  a.href=url;a.download=`manga-ranking-analysis-${date}.csv`;
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  XLSX.writeFile(wb, `manga-ranking-${today}.xlsx`);
 }
 document.getElementById('csvBtn').onclick=exportCSV;
+
 
 function loadData(){
   const raw=document.getElementById('pasteArea').value.trim();

@@ -465,7 +465,7 @@ function buildCard(key,list,lim){
     const badges=(pubBadge||labBadge)?`<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${pubBadge}${labBadge}</div>`:'';
     return `<div class="ritem"><span class="${rc}">${medal}</span><div class="rinfo"><div class="rtitle">${clean}</div>${authorHtml}${badges}</div></div>`;
   }).join('');
-  return `<div class="pcard">
+  return `<div class="pcard" data-card-key="${key}">
     <div class="pcard-hdr" onclick="toggleCard('${key}',this)">
       <span class="pcard-name">${name}</span>
       ${selectedAttr?`<span style="font-size:11px;color:#1a56a3;font-weight:600">「${selectedAttr}」絞込</span>`:''}
@@ -513,9 +513,25 @@ function toggleGroup(svc, hdrEl){
   const body=hdrEl.nextElementSibling;
   const arrow=hdrEl.querySelector('.svc-ribbon-toggle');
   const isOpen=!body.classList.contains('collapsed');
+  const willOpen=!isOpen;
   body.classList.toggle('collapsed',isOpen);
-  arrow.classList.toggle('open',!isOpen);
-  groupOpenState[svc]=!isOpen;
+  arrow.classList.toggle('open',willOpen);
+  groupOpenState[svc]=willOpen;
+  // 中の個別カードも全部同じ状態に揃える
+  body.querySelectorAll('.pcard').forEach(card=>{
+    const cardBody=card.querySelector('.pcard-body');
+    const cardArrow=card.querySelector('.pcard-toggle');
+    const key=card.dataset.cardKey;
+    if(willOpen){
+      cardBody.classList.remove('collapsed');
+      cardArrow.classList.add('open');
+      if(key) cardOpenState[key]=true;
+    } else {
+      cardBody.classList.add('collapsed');
+      cardArrow.classList.remove('open');
+      if(key) cardOpenState[key]=false;
+    }
+  });
 }
 
 function renderRanking(){

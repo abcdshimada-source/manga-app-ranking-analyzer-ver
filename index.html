@@ -117,6 +117,7 @@ textarea:focus{border-color:#1a1a1a}
 .rauthor{font-size:11px;color:#888}
 .rrole{font-size:10px;color:#aaa;margin-right:1px}
 .rpub{font-size:10px;padding:1px 7px;border-radius:999px;background:#f0f0f0;color:#888;white-space:nowrap}
+.rpub-wrap{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
 .rlabel{font-size:10px;padding:1px 7px;border-radius:999px;background:#e8f0fe;color:#1a56a3;white-space:nowrap}
 .attr-cloud{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:1rem}
 .attr-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:999px;cursor:pointer;font-weight:600;transition:opacity .15s;border:none;font-size:12px}
@@ -156,7 +157,6 @@ textarea:focus{border-color:#1a1a1a}
 <body>
 <div class="app">
 
-  <!-- ===== ヒーロー ===== -->
   <div class="hero">
     <h1>📊 マンガランキング分析ツール</h1>
     <p>複数のマンガプラットフォームのランキングを一括取得・分析するツールです。<br>Chrome拡張でデータを収集して、このページで分析できます。</p>
@@ -172,7 +172,6 @@ textarea:focus{border-color:#1a1a1a}
     </a>
   </div>
 
-  <!-- ===== 使い方 ===== -->
   <div class="how-section">
     <h2>🚀 使い方</h2>
     <div class="steps">
@@ -209,7 +208,6 @@ textarea:focus{border-color:#1a1a1a}
     </div>
   </div>
 
-  <!-- ===== ツール本体 ===== -->
   <div class="tool-section">
     <h2>📈 分析ツール</h2>
 
@@ -254,7 +252,6 @@ textarea:focus{border-color:#1a1a1a}
         <button class="svc-pill svc-nico active" data-svc="niconico">ニコニコ</button>
       </div>
 
-      <!-- エクスポートボタン群 -->
       <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;gap:8px;flex-wrap:wrap;align-items:center">
         <span style="font-size:11px;color:#888">表紙DL期間:</span>
         <select id="coverPeriodSel" style="font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;background:#fff">
@@ -317,7 +314,7 @@ textarea:focus{border-color:#1a1a1a}
 
 <script>
 const PICCOMA_GENRE_AXIS={fantasy:['shounen','seinen'],action:['shounen','seinen'],romance:['josei'],bl:['bl'],tl:['tl'],all:['general']};
-const GENRE_AXIS={shounen:'shounen',seinen:'seinen',shoujo:'shoujo',josei:'josei',bl:'bl',tl:'tl',fantasy:'shounen',action:'shounen',romance:'josei',all:'general'};
+const GENRE_AXIS={shounen:'shounen',seinen:'seinen',shoujo:'shoujo',josei:'josei',bl:'bl',tl:'tl',fantasy:'shounen',action:'shounen',romance:'josei',all:'general',general:'general',all:'general','総合':'general','少年':'shounen','青年':'seinen','少女':'shoujo','女性':'josei','恋愛':'josei'};
 const AXIS_LABELS={general:'総合',shounen:'少年',seinen:'青年',shoujo:'少女',josei:'女性',bl:'BL',tl:'TL'};
 const AXIS_ORDER=['general','shounen','seinen','shoujo','josei','bl','tl'];
 const AXIS_COLORS={
@@ -334,6 +331,7 @@ const ATTR_WORDS=["転生","転移","異世界","前世","生まれ変わり","�
 const STORAGE_KEY='manga_ranking_v16';
 
 function cleanTitle(t){
+  if(!t) return '';
   return t.replace(/【[^】]*】/g,'').replace(/（[^）]*）/g,'').replace(/\[[^\]]*\]/g,'')
     .replace(/《[^》]*》/g,'').replace(/@[A-Za-z]+/g,'')
     .replace(/第\d+巻?/g,'').replace(/vol\.\d+/gi,'').replace(/\d+話売り/g,'')
@@ -344,9 +342,10 @@ function parseAuthor(raw){
   const rp=/(.+?)[（(]([^）)]+)[）)]/g;const rps=[];let m;
   while((m=rp.exec(raw))!==null){const name=m[1].trim(),role=m[2].trim();if(name.length>=1&&name.length<=30){const rl={'漫画':'漫画','著者':'著者','原作':'原作','作画':'作画','キャラクターデザイン':'キャラデザ','キャラクター原案':'キャラ原案','原案':'原案','ストーリー':'ストーリー','監修':'監修'};rps.push({name,role:rl[role]||role});}}
   if(rps.length>0)return{type:'roles',parts:rps};
-  if(/原作[：:]|漫画[：:]|作画[：:]/.test(raw)){const parts=[];const kw=/(原作|漫画|作画|原案|キャラクター原案|ストーリー|監修)[：:]\s*([^\s　原漫作キャラスト監]{2,})/g;while((m=kw.exec(raw))!==null)parts.push({role:m[1],name:m[2].trim()});if(parts.length>0)return{type:'roles',parts};}
+  if(/原作[：:]|漫画[：:]|作画[：:]/.test(raw)){const parts=[];const kw=/(原作|漫画|作画|原案|キャラクター原案|ストーリー|監修)[：:]\s*([^\s 原漫作キャラスト監]{2,})/g;while((m=kw.exec(raw))!==null)parts.push({role:m[1],name:m[2].trim()});if(parts.length>0)return{type:'roles',parts};}
   const words=raw.split(/\s+/).filter(Boolean);
   if(words.length===2){const ok=w=>w.length>=2&&!/[（）【】「」、。]/.test(w);if(ok(words[0])&&ok(words[1]))return{type:'duo',original:words[0],art:words[1]};}
+  if(words.length>=3){return{type:'single',name:words.join(' / ')};}
   return{type:'single',name:raw};
 }
 function renderAuthorHtml(raw){
@@ -357,9 +356,19 @@ function renderAuthorHtml(raw){
   if(p.type==='roles')return `<div class="rauthor-wrap">${p.parts.map(q=>`<span class="rrole">${q.role}</span><span class="rauthor">${q.name}</span>`).join(sep)}</div>`;
   return '';
 }
-function parseKey(k){const p=k.split('_');return{svc:p[0],genre:p.slice(1,-1).join('_'),period:p[p.length-1]};}
-function getAxes(svc,genre){if(svc==='piccoma'&&PICCOMA_GENRE_AXIS[genre])return PICCOMA_GENRE_AXIS[genre];const ax=GENRE_AXIS[genre];return ax?[ax]:['all'];}
-function svcName(svc,genre,period){return `${SVC_NAMES[svc]||svc} ${AXIS_LABELS[GENRE_AXIS[genre]||genre]||genre} ${PERIOD_NAMES[period]||period}`;}
+function parseKey(k){
+  const p=k.split('_');
+  let genre = p.slice(1,-1).join('_');
+  return{svc:p[0],genre:genre,period:p[p.length-1]};
+}
+function getAxes(svc,genre){
+  if(svc==='piccoma'&&PICCOMA_GENRE_AXIS[genre])return PICCOMA_GENRE_AXIS[genre];
+  const ax=GENRE_AXIS[genre];
+  return ax?[ax]:['all'];
+}
+function svcName(svc,genre,period){
+  return `${SVC_NAMES[svc]||svc} ${AXIS_LABELS[GENRE_AXIS[genre]||genre]||genre} ${PERIOD_NAMES[period]||period}`;
+}
 
 let rawData={},activeTab='overview',selectedAttr=null;
 let activePeriod='daily',activeAxis='all';
@@ -478,7 +487,7 @@ function buildCard(key,list,lim){
     const authorHtml=renderAuthorHtml(it.author);
     const pubBadge=it.publisher?`<span class="rpub">${it.publisher}</span>`:'';
     const labBadge=it.label?`<span class="rlabel">${it.label}</span>`:'';
-    const badges=(pubBadge||labBadge)?`<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${pubBadge}${labBadge}</div>`:'';
+    const badges=(pubBadge||labBadge)?`<div class="rpub-wrap">${pubBadge}${labBadge}</div>`:'';
     return `<div class="ritem"><span class="${rc}">${medal}</span>${it.cover?`<div class="rcover" onclick="downloadCover(event,'${(it.cover||'').replace(/'/g,'%27')}','${cleanTitle(it.title).replace(/'/g,'').replace(/"/g,'').slice(0,40)}')"><img src="${it.cover}" alt="" loading="lazy" onerror="this.parentElement.outerHTML='&lt;div class=&quot;rcover-empty&quot;&gt;NO IMG&lt;/div&gt;'"></div>`:'<div class="rcover-empty">—</div>'}<div class="rinfo"><div class="rtitle">${clean}</div>${authorHtml}${badges}</div></div>`;
   }).join('');
   return `<div class="pcard" data-card-key="${key}">
@@ -501,10 +510,10 @@ function toggleCard(key,hdrEl){
 }
 
 function renderCurrentTab(){
-  if(activeTab==='overview')renderOverview();
-  else if(activeTab==='ranking')renderRanking();
-  else if(activeTab==='trends')renderTrends();
-  else if(activeTab==='cross')renderCross();
+  if(activeTab==='overview') renderOverview();
+  else if(activeTab==='ranking') renderRanking();
+  else if(activeTab==='trends') renderTrends();
+  else if(activeTab==='cross') renderCross();
 }
 
 function renderOverview(){
@@ -533,7 +542,6 @@ function toggleGroup(svc, hdrEl){
   body.classList.toggle('collapsed',isOpen);
   arrow.classList.toggle('open',willOpen);
   groupOpenState[svc]=willOpen;
-  // 中の個別カードも全部同じ状態に揃える
   body.querySelectorAll('.pcard').forEach(card=>{
     const cardBody=card.querySelector('.pcard-body');
     const cardArrow=card.querySelector('.pcard-toggle');
@@ -551,9 +559,8 @@ function toggleGroup(svc, hdrEl){
 }
 
 function renderRanking(){
-  // サービス単位でキーをグループ化
   const SVC_RIBBON_CLASS={piccoma:'r-pic',seymour:'r-sey',renta:'r-renta',niconico:'r-nico'};
-  const SVC_DISPLAY_ORDER=['piccoma','seymour','renta','niconico']; // 表示順
+  const SVC_DISPLAY_ORDER=['piccoma','seymour','renta','niconico'];
   const grouped={};
   for(const key of Object.keys(rawData)){
     const{svc}=parseKey(key);
@@ -562,11 +569,9 @@ function renderRanking(){
   }
   
   let html='';let totalCnt=0;
-  // 表示順でループ
   for(const svc of SVC_DISPLAY_ORDER){
     if(!grouped[svc]) continue;
     if(!matchesSvc(svc)) continue;
-    // このサービスのカードを生成
     let cardsHtml='';let visibleCnt=0;
     for(const key of grouped[svc]){
       const card=buildCard(key,rawData[key],99);
@@ -576,7 +581,7 @@ function renderRanking(){
     totalCnt+=visibleCnt;
     const ribbonClass=SVC_RIBBON_CLASS[svc]||'';
     const svcDisp=SVC_NAMES[svc]||svc;
-    const isOpen=groupOpenState[svc]!==false; // デフォルトopen
+    const isOpen=groupOpenState[svc]!==false;
     html+=`<div class="svc-group">
       <div class="svc-ribbon ${ribbonClass}" onclick="toggleGroup('${svc}',this)">
         <span class="svc-ribbon-name">${svcDisp}</span>
@@ -590,7 +595,6 @@ function renderRanking(){
   }
   document.getElementById('rankBadge').textContent=totalCnt+'ランキング';
   document.getElementById('rankGrid').innerHTML=html||'<div class="empty">データなし</div>';
-  // pgridのスタイル上書き不要のため、ラッパーを外す（rankGridはそのまま）
 }
 
 function renderTrends(){
@@ -676,10 +680,6 @@ function renderCross(){
   }).join(''):'<tr><td colspan="3" class="empty">複数サービス登場タイトルなし</td></tr>';
 }
 
-// ===== Excel エクスポート（.xlsx） =====
-// 日次データ集積用に正規化した形で出力。各シートにオートフィルタ付き。
-
-// 指定条件のアイテム取得（一時的なフィルタ）
 function getItemsByCondition(period, axis, lim){
   const items=[];
   for(const[key,list] of Object.entries(rawData)){
@@ -709,26 +709,21 @@ function getUniqueByCondition(period, axis){
   return result;
 }
 
-// シート作成ヘルパー: 2D配列からシートを作り、オートフィルタを設定
 function makeSheet(data, opts={}){
   const ws = XLSX.utils.aoa_to_sheet(data);
   if(data.length>1){
-    // オートフィルタを1行目に設定
     const numCols = data[0].length;
     const lastCol = XLSX.utils.encode_col(numCols-1);
     const lastRow = data.length;
     ws['!autofilter'] = { ref: `A1:${lastCol}${lastRow}` };
-    // 列幅を自動調整（ざっくり）
     ws['!cols'] = data[0].map((_,i) => {
       const maxLen = data.reduce((m,row) => {
         const v = String(row[i]==null?'':row[i]);
         return Math.max(m, v.length);
       }, 0);
-      // 日本語1文字を2幅扱い
       const jpLen = Math.min(50, Math.max(8, maxLen * 1.4));
       return { wch: jpLen };
     });
-    // ヘッダー行を固定
     ws['!freeze'] = { xSplit: 0, ySplit: 1 };
     ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
   }
@@ -742,8 +737,6 @@ function exportCSV(){
   const today = new Date().toISOString().slice(0,10);
   const wb = XLSX.utils.book_new();
 
-  // ========== Sheet1: ランキング全件（メインデータ） ==========
-  // 各列でオートフィルタ絞り込みできるよう、サービス・ジャンル・期間を独立列に
   const SVC_DISPLAY = { renta:'Renta!', piccoma:'ピッコマ', seymour:'シーモア', niconico:'ニコニコ漫画' };
   const GENRE_DISPLAY = { shounen:'少年', seinen:'青年', shoujo:'少女', josei:'女性', bl:'BL', tl:'TL', fantasy:'ファンタジー', action:'アクション', romance:'恋愛' };
   const rankHeader = ['取得日','サービス','元ジャンル','ジャンル軸','期間','順位','タイトル','クリーンタイトル','作者','原作者','作画者','出版社','レーベル','表紙URL','サービスキー'];
@@ -751,7 +744,6 @@ function exportCSV(){
   const allItems = getItemsByCondition('all','all',99);
   for(const it of allItems){
     const axLabel = it._axes.map(ax=>AXIS_LABELS[ax]||ax).join('/');
-    // 作者をパースして原作・作画に分離
     const parsed = parseAuthor(it.author||'');
     let original='', art='';
     if(parsed){
@@ -778,7 +770,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(rankRows), 'ランキング');
 
-  // ========== Sheet2: 属性ワード集計 ==========
   const attrHeader = ['取得日','期間','ジャンル','属性ワード','出現数','主な軸'];
   const attrRows = [attrHeader];
   const periods = ['daily','monthly','all'];
@@ -807,8 +798,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(attrRows), '属性ワード集計');
 
-  // ========== Sheet2.5: 属性ワード×作品（フィルタ用） ==========
-  // 各属性ワードに該当する作品を1行ずつ列挙。Excelで属性ワード列のフィルタで作品が絞り込める
   const attrWorkHeader = ['取得日','属性ワード','サービス','元ジャンル','ジャンル軸','期間','順位','タイトル','クリーンタイトル','作者','出版社','レーベル'];
   const attrWorkRows = [attrWorkHeader];
   for(const[key,list] of Object.entries(rawData)){
@@ -834,7 +823,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(attrWorkRows), '属性ワード×作品');
 
-  // ========== Sheet3: 出版社集計 ==========
   const pubHeader = ['取得日','期間','ジャンル','出版社','作品数'];
   const pubRows = [pubHeader];
   for(const period of periods){
@@ -851,7 +839,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(pubRows), '出版社集計');
 
-  // ========== Sheet4: レーベル集計 ==========
   const labHeader = ['取得日','期間','ジャンル','レーベル','作品数'];
   const labRows = [labHeader];
   for(const period of periods){
@@ -868,7 +855,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(labRows), 'レーベル集計');
 
-  // ========== Sheet5: クロス集計（複数サービス登場） ==========
   const crossHeader = ['取得日','期間','タイトル','登場サービス数','登場ジャンル軸','サービス・順位'];
   const crossRows = [crossHeader];
   for(const period of periods){
@@ -892,7 +878,6 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(crossRows), 'クロス集計');
 
-  // ========== Sheet6: サマリー ==========
   const sumRows = [['項目','値']];
   const allUniq = getUniqueByCondition('all','all');
   sumRows.push(['取得日', today]);
@@ -911,51 +896,32 @@ function exportCSV(){
   }
   XLSX.utils.book_append_sheet(wb, makeSheet(sumRows), 'サマリー');
 
-  // 出力
   XLSX.writeFile(wb, `manga-ranking-${today}.xlsx`);
 }
 document.getElementById('csvBtn').onclick=exportCSV;
 
-// ===== 表紙ダウンロード機能 =====
-// ファイル名用に安全化
 function safeName(s){
   return (s||'').replace(/[\\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim().slice(0,80) || 'untitled';
 }
-// 拡張子推測
 function getExt(url){
   const m = (url||'').match(/\.(jpe?g|png|webp|gif)(\?|$)/i);
   return m ? m[1].toLowerCase().replace('jpeg','jpg') : 'jpg';
 }
 
-// 個別表紙DL（クリック時）
 async function downloadCover(ev, url, title){
   ev.stopPropagation();
   if(!url) return;
-  try{
-    const res = await fetch(url, {mode:'cors'});
-    if(!res.ok) throw new Error('fetch failed');
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeName(title)}.${getExt(url)}`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  } catch(e){
-    // CORSで失敗する可能性 → 新規タブで開いてユーザー保存を促す
-    window.open(url, '_blank');
-  }
+  // CORS制限回避のため直接別タブ展開フォールバックを優先
+  window.open(url, '_blank');
 }
 
-// 一括ZIP DL
 async function downloadCoversZip(){
   if(typeof JSZip === 'undefined'){alert('ZIPライブラリの読み込みに失敗しました');return;}
-  // 期間セレクタの値で対象を決定
   const periodSel = document.getElementById('coverPeriodSel').value;
   let items;
   if(periodSel === 'current'){
     items = getItems(99).filter(it => it.cover && it.cover.trim());
   } else {
-    // 期間指定モード: ジャンル・サービスは現在のフィルタ条件を使う
     items = [];
     for(const[key,list] of Object.entries(rawData)){
       if(!list||!list.length)continue;
@@ -978,11 +944,7 @@ async function downloadCoversZip(){
   const zip = new JSZip();
   let done = 0, failed = 0;
   const total = items.length;
-  
-  // 同じタイトルが複数サービスに登場する場合の重複対策
   const usedNames = {};
-  
-  // 並列ダウンロード（同時8件）
   const CONCURRENCY = 8;
   let idx = 0;
   
@@ -1016,18 +978,16 @@ async function downloadCoversZip(){
     }
   }
   
-  // CONCURRENCY 個のワーカーを並列起動
   await Promise.all(Array.from({length: CONCURRENCY}, () => worker()));
   
   if(done === 0){
-    alert('画像の取得に失敗しました（CORSエラーの可能性）');
+    alert('画像のサーバー制限(CORS)により、一括ダウンロードZIPの生成がブロックされました。表紙画像は、各作品の画像を直接クリックして新規タブから保存してください。');
     btn.textContent = originalText;
     btn.disabled = false;
     return;
   }
   
   btn.textContent = '📦 ZIP生成中...';
-  // 画像は既に圧縮済みなので、圧縮なし（STORE）で高速化
   const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
   const a = document.createElement('a');
   const date = new Date().toISOString().slice(0,10);
@@ -1040,7 +1000,6 @@ async function downloadCoversZip(){
   setTimeout(()=>{btn.textContent=originalText;btn.disabled=false;}, 4000);
 }
 document.getElementById('coversZipBtn').onclick = downloadCoversZip;
-
 
 function loadData(){
   const raw=document.getElementById('pasteArea').value.trim();

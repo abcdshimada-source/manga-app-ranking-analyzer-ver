@@ -36,6 +36,15 @@ body{background:#f8f8f8;color:#1a1a1a;font-family:-apple-system,'Hiragino Sans',
 .step p{font-size:12px;color:#666;line-height:1.6}
 .step code{font-size:10px;background:#e8e8e8;padding:1px 5px;border-radius:4px;font-family:monospace}
 
+.instruction-box {margin-top:1.5rem;padding:14px 18px;border-radius:10px;font-size:12px;color:#555;line-height:1.8;}
+.instruction-box.gray {background:#f5f5f5;}
+.instruction-box.orange {background:#fff8e1;border:1px solid #ffe0b2;}
+.instruction-box-ttl {font-size:13px;font-weight:700;margin-bottom:8px;}
+.instruction-box.gray .instruction-box-ttl {color:#1a1a1a;}
+.instruction-box.orange .instruction-box-ttl {color:#e65100;}
+.instruction-box ol {padding-left:1.5rem;margin-bottom:0;}
+.instruction-box li {margin-bottom:4px;}
+
 /* ===== ツール本体 ===== */
 .tool-section{background:#fff;border-radius:16px;padding:2rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .tool-section h2{font-size:18px;font-weight:800;margin-bottom:1.25rem}
@@ -79,7 +88,7 @@ textarea:focus{border-color:#1a1a1a}
 .sec-ttl{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .badge{font-size:11px;font-weight:400;color:#888;background:#f0f0f0;padding:2px 9px;border-radius:999px}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
-/* サービスグループ（リボン付き折りたたみ） */
+/* サービスグループ */
 .svc-group{margin-bottom:1.25rem;border-radius:14px;overflow:hidden;border:1px solid #e8e8e8;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .svc-ribbon{display:flex;align-items:center;gap:10px;padding:12px 18px;cursor:pointer;user-select:none;font-weight:700;font-size:15px;transition:filter .1s}
 .svc-ribbon:hover{filter:brightness(.96)}
@@ -197,13 +206,32 @@ textarea:focus{border-color:#1a1a1a}
       </div>
     </div>
 
-    <div style="margin-top:1.5rem;padding:12px 16px;background:#f5f5f5;border-radius:10px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:6px">Chrome拡張のインストール手順</div>
-      <ol style="font-size:12px;color:#555;line-height:2;padding-left:1.2rem">
-        <li>ZIPファイルを解凍する</li>
+    <div class="instruction-box gray">
+      <div class="instruction-box-ttl">Chrome拡張（ランキング取得用）のインストール手順</div>
+      <ol>
+        <li>ダウンロードしたZIPファイルを解凍する</li>
         <li>Chromeで <code style="background:#e8e8e8;padding:1px 5px;border-radius:4px">chrome://extensions</code> を開く</li>
         <li>右上の「デベロッパーモード」をONにする</li>
         <li>「パッケージ化されていない拡張機能を読み込む」→ 解凍したフォルダを選択</li>
+      </ol>
+    </div>
+
+    <div class="instruction-box orange">
+      <div class="instruction-box-ttl">⚠️ 表紙画像をZIPで一括ダウンロードする場合の必須設定</div>
+      <p style="margin-bottom:8px;">各電子書籍サイトのセキュリティ制限（CORS）を回避するため、画像取得時のみ専用のChrome拡張機能を使用します。</p>
+      
+      <div style="margin: 12px 0;">
+        <a href="https://chromewebstore.google.com/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf?pli=1" target="_blank" class="dl-btn" style="background:#e65100; font-size:13px; padding:10px 20px;">
+          🔗 Allow CORS 拡張機能をインストール
+        </a>
+      </div>
+
+      <ol>
+        <li>上のボタンから拡張機能をChromeに追加します。</li>
+        <li>Chrome画面右上の「パズルマーク」から拡張機能リストを開き、この拡張機能の「ピンマーク」を押してツールバーに固定します。</li>
+        <li>ツールバーのアイコン（Cのマーク）をクリックし、左上の電源ボタンを押して<strong>「ON（アイコンに色がつく状態）」</strong>にします。</li>
+        <li>このツールの「🖼 表紙をJPEGで一括DL」ボタンを押すとダウンロードが始まります。</li>
+        <li style="color:#c0392b;font-weight:bold;margin-top:6px;">※ダウンロードが終わったら、セキュリティのため必ず「OFF（グレーの状態）」に戻してください。</li>
       </ol>
     </div>
   </div>
@@ -253,6 +281,7 @@ textarea:focus{border-color:#1a1a1a}
       </div>
 
       <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:#c0392b;font-weight:bold;margin-right:10px;">※一括DLは上の「使い方」にあるCORS回避拡張をONにして実行してください</span>
         <span style="font-size:11px;color:#888">表紙DL期間:</span>
         <select id="coverPeriodSel" style="font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;background:#fff">
           <option value="current">現在表示中</option>
@@ -260,7 +289,7 @@ textarea:focus{border-color:#1a1a1a}
           <option value="monthly">月間のみ</option>
           <option value="all">両方</option>
         </select>
-        <button class="btn-secondary" id="coversZipBtn">🖼 表紙を一括DL（ZIP）</button>
+        <button class="btn-secondary" id="coversZipBtn">🖼 表紙をJPEGで一括DL（ZIP）</button>
         <button class="btn-secondary btn-green" id="csvBtn">⬇ Excelエクスポート（.xlsx）</button>
       </div>
 
@@ -314,7 +343,7 @@ textarea:focus{border-color:#1a1a1a}
 
 <script>
 const PICCOMA_GENRE_AXIS={fantasy:['shounen','seinen'],action:['shounen','seinen'],romance:['josei'],bl:['bl'],tl:['tl'],all:['general']};
-const GENRE_AXIS={shounen:'shounen',seinen:'seinen',shoujo:'shoujo',josei:'josei',bl:'bl',tl:'tl',fantasy:'shounen',action:'shounen',romance:'josei',all:'general',general:'general',all:'general','総合':'general','少年':'shounen','青年':'seinen','少女':'shoujo','女性':'josei','恋愛':'josei'};
+const GENRE_AXIS={shounen:'shounen',seinen:'seinen',shoujo:'shoujo',josei:'josei',bl:'bl',tl:'tl',fantasy:'shounen',action:'shounen',romance:'josei',all:'general',general:'general','総合':'general','少年':'shounen','青年':'seinen','少女':'shoujo','女性':'josei','恋愛':'josei'};
 const AXIS_LABELS={general:'総合',shounen:'少年',seinen:'青年',shoujo:'少女',josei:'女性',bl:'BL',tl:'TL'};
 const AXIS_ORDER=['general','shounen','seinen','shoujo','josei','bl','tl'];
 const AXIS_COLORS={
@@ -389,7 +418,6 @@ function loadSaved(){
   }catch(e){return false;}
 }
 
-// フィルター
 document.querySelectorAll('[data-p]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('[data-p]').forEach(b=>b.classList.toggle('active',b===btn));
@@ -532,7 +560,6 @@ function renderOverview(){
   document.getElementById('ovGrid').innerHTML=html||'<div class="empty">データなし</div>';
 }
 
-// サービスグループの開閉状態
 let groupOpenState={};
 function toggleGroup(svc, hdrEl){
   const body=hdrEl.nextElementSibling;
@@ -903,16 +930,48 @@ document.getElementById('csvBtn').onclick=exportCSV;
 function safeName(s){
   return (s||'').replace(/[\\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim().slice(0,80) || 'untitled';
 }
-function getExt(url){
-  const m = (url||'').match(/\.(jpe?g|png|webp|gif)(\?|$)/i);
-  return m ? m[1].toLowerCase().replace('jpeg','jpg') : 'jpg';
+
+async function fetchAndConvertToJpeg(url) {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error('fetch failed');
+  const blob = await res.blob();
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(blob);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objUrl);
+      canvas.toBlob(resolve, 'image/jpeg', 0.9);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objUrl);
+      reject(new Error('canvas draw failed'));
+    };
+    img.src = objUrl;
+  });
 }
 
 async function downloadCover(ev, url, title){
   ev.stopPropagation();
   if(!url) return;
-  // CORS制限回避のため直接別タブ展開フォールバックを優先
-  window.open(url, '_blank');
+  try{
+    const jpegBlob = await fetchAndConvertToJpeg(url);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(jpegBlob);
+    a.download = `${safeName(title)}.jpg`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch(e){
+    alert('画像の保存に失敗しました。CORS回避用の拡張機能がONになっているか確認してください。\n※直接タブを開きます');
+    window.open(url, '_blank');
+  }
 }
 
 async function downloadCoversZip(){
@@ -953,15 +1012,15 @@ async function downloadCoversZip(){
       const i = idx++;
       const it = items[i];
       try{
-        const res = await fetch(it.cover, {mode:'cors'});
-        if(!res.ok) throw new Error('fetch failed');
-        const blob = await res.blob();
+        const jpegBlob = await fetchAndConvertToJpeg(it.cover);
         const svcFolder = SVC_NAMES[it._svc]||it._svc;
         const genreFolder = AXIS_LABELS[GENRE_AXIS[it._genre]||it._genre]||it._genre;
         const periodFolder = PERIOD_NAMES[it._period]||it._period;
         const folder = `${svcFolder}/${genreFolder}_${periodFolder}`;
-        let name = `${String(it.rank).padStart(2,'0')}_${safeName(it._clean)}.${getExt(it.cover)}`;
+        
+        let name = `${String(it.rank).padStart(2,'0')}_${safeName(it._clean)}.jpg`;
         const fullPath = `${folder}/${name}`;
+        
         if(usedNames[fullPath]){
           usedNames[fullPath]++;
           const dot = name.lastIndexOf('.');
@@ -969,7 +1028,7 @@ async function downloadCoversZip(){
         } else {
           usedNames[fullPath] = 1;
         }
-        zip.file(`${folder}/${name}`, blob);
+        zip.file(`${folder}/${name}`, jpegBlob);
         done++;
       } catch(e){
         failed++;
@@ -981,7 +1040,7 @@ async function downloadCoversZip(){
   await Promise.all(Array.from({length: CONCURRENCY}, () => worker()));
   
   if(done === 0){
-    alert('画像のサーバー制限(CORS)により、一括ダウンロードZIPの生成がブロックされました。表紙画像は、各作品の画像を直接クリックして新規タブから保存してください。');
+    alert('画像の取得に失敗しました。\nブラウザのセキュリティ設定（CORS）によってブロックされています。\n「Allow CORS」などの拡張機能をONにしてから再度お試しください。');
     btn.textContent = originalText;
     btn.disabled = false;
     return;

@@ -902,4 +902,171 @@ function exportCSV(){
   sumRows.push(['', '']);
   sumRows.push(['サービス別取得件数','']);
   const svcCount={};for(const it of allItems)svcCount[it._svc]=(svcCount[it._svc]||0)+1;
-  for(const[svc,c] of Object.ent
+  for(const[svc,c] of Object.entries(svcCount)) sumRows.push([SVC_NAMES[svc]||svc, c]);
+  sumRows.push(['', '']);
+  sumRows.push(['ジャンル別ユニークタイトル数','']);
+  for(const ax of AXIS_ORDER){
+    const u = getUniqueByCondition('all', ax);
+    if(u.length) sumRows.push([AXIS_LABELS[ax], u.length]);
+  }
+  XLSX.utils.book_append_sheet(wb, makeSheet(sumRows), 'サマリー');
+
+  // 出力
+  XLSX.writeFile(wb, `manga-ranking-${today}.xlsx`);
+}
+document.getElementById('csvBtn').onclick=exportCSV;
+
+// ===== 表紙ダウンロード機能 =====
+// ファイル名用に安全化
+function safeName(s){
+  return (s||'').replace(/[\\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim().slice(0,80) || 'untitled';
+}
+// 拡張子推測
+function getExt(url){
+  const m = (url||'').match(/\.(jpe?g|png|webp|gif)(\?|$)/i);
+  return m ? m[1].toLowerCase().replace('jpeg','jpg') : 'jpg';
+}
+
+// 個別表紙DL（クリック時）
+async function downloadCover(ev, url, title){
+  ev.stopPropagation();
+  if(!url) return;
+  try{
+    const res = await fetch(url, {mode:'cors'});
+    if(!res.ok) throw new Error('fetch failed');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeName(title)}.${getExt(url)}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch(e){
+    // CORSで失敗する可能性 → 新規タブで開いてユーザー保存を促す
+    window.open(url, '_blank');
+  }
+}
+
+// 一括ZIP DL
+async function downloadCoversZip(){
+  if(typeof JSZip === 'undefined'){alert('ZIPライブラリの読み込みに失敗しました');return;}
+  // 期間セレクタの値で対象を決定
+  const periodSel = document.getElementById('coverPeriodSel').value;
+  let items;
+  if(periodSel === 'current'){
+    items = getItems(99).filter(it => it.cover && it.cover.trim());
+  } else {
+    // 期間指定モード: ジャンル・サービスは現在のフィルタ条件を使う
+    items = [];
+    for(const[key,list] of Object.entries(rawData)){
+      if(!list||!list.length)continue;
+      const{svc,genre,period}=parseKey(key);
+      if(periodSel !== 'all' && period !== periodSel)continue;
+      if(!matchesSvc(svc))continue;
+      const axes=getAxes(svc,genre);
+      if(!matchesAxis(axes))continue;
+      for(const it of list){
+        if(!it.cover||!it.cover.trim())continue;
+        items.push({...it,_key:key,_svc:svc,_genre:genre,_period:period,_axes:axes,_clean:cleanTitle(it.title)});
+      }
+    }
+  }
+  if(!items.length){alert('表紙画像のあるデータがありません');return;}
+  const btn = document.getElementById('coversZipBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  
+  const zip = new JSZip();
+  let done = 0, failed = 0;
+  const total = items.length;
+  
+  // 同じタイトルが複数サービスに登場する場合の重複対策
+  const usedNames = {};
+  
+  // 並列ダウンロード（同時8件）
+  const CONCURRENCY = 8;
+  let idx = 0;
+  
+  async function worker(){
+    while(idx < items.length){
+      const i = idx++;
+      const it = items[i];
+      try{
+        const res = await fetch(it.cover, {mode:'cors'});
+        if(!res.ok) throw new Error('fetch failed');
+        const blob = await res.blob();
+        const svcFolder = SVC_NAMES[it._svc]||it._svc;
+        const genreFolder = AXIS_LABELS[GENRE_AXIS[it._genre]||it._genre]||it._genre;
+        const periodFolder = PERIOD_NAMES[it._period]||it._period;
+        const folder = `${svcFolder}/${genreFolder}_${periodFolder}`;
+        let name = `${String(it.rank).padStart(2,'0')}_${safeName(it._clean)}.${getExt(it.cover)}`;
+        const fullPath = `${folder}/${name}`;
+        if(usedNames[fullPath]){
+          usedNames[fullPath]++;
+          const dot = name.lastIndexOf('.');
+          name = `${name.slice(0,dot)}_${usedNames[fullPath]}${name.slice(dot)}`;
+        } else {
+          usedNames[fullPath] = 1;
+        }
+        zip.file(`${folder}/${name}`, blob);
+        done++;
+      } catch(e){
+        failed++;
+      }
+      btn.textContent = `📥 取得中... ${done+failed}/${total}`;
+    }
+  }
+  
+  // CONCURRENCY 個のワーカーを並列起動
+  await Promise.all(Array.from({length: CONCURRENCY}, () => worker()));
+  
+  if(done === 0){
+    alert('画像の取得に失敗しました（CORSエラーの可能性）');
+    btn.textContent = originalText;
+    btn.disabled = false;
+    return;
+  }
+  
+  btn.textContent = '📦 ZIP生成中...';
+  // 画像は既に圧縮済みなので、圧縮なし（STORE）で高速化
+  const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href = URL.createObjectURL(blob);
+  a.download = `manga-covers-${date}.zip`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  
+  btn.textContent = `✅ 完了 (${done}件${failed?' / '+failed+'件失敗':''})`;
+  setTimeout(()=>{btn.textContent=originalText;btn.disabled=false;}, 4000);
+}
+document.getElementById('coversZipBtn').onclick = downloadCoversZip;
+
+
+function loadData(){
+  const raw=document.getElementById('pasteArea').value.trim();
+  const err=document.getElementById('pasteErr');err.classList.remove('on');
+  try{
+    if(!raw)throw new Error('empty');
+    const json=raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    const parsed=JSON.parse(json);
+    rawData={};for(const[k,v] of Object.entries(parsed)){if(Array.isArray(v))rawData[k]=v;}
+    const existingSvcs=new Set(Object.keys(rawData).map(k=>parseKey(k).svc));
+    activeSvcs=new Set([...existingSvcs]);
+    document.querySelectorAll('[data-svc]').forEach(b=>b.classList.toggle('active',activeSvcs.has(b.dataset.svc)));
+    document.getElementById('mainContent').style.display='';
+    document.getElementById('inputArea').style.display='none';
+    selectedAttr=null;cardOpenState={};
+    document.getElementById('attrPanel').classList.remove('on');
+    updateStatusBar();renderCurrentTab();saveData();
+  }catch(e){err.classList.add('on');}
+}
+document.getElementById('loadBtn').onclick=loadData;
+
+if(loadSaved()){
+  document.getElementById('mainContent').style.display='';
+  document.getElementById('inputArea').style.display='none';
+  updateStatusBar();renderCurrentTab();
+}
+</script>
+</body>
+</html>
